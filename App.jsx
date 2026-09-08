@@ -402,7 +402,7 @@ async function generateProposalPdf(pageEls, filename) {
       scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
-      windowWidth: el.scrollWidth,
+      windowWidth: Math.max(el.scrollWidth, 1200),
       windowHeight: el.scrollHeight,
     });
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -1785,8 +1785,8 @@ function GlobalStyles() {
         top: 0;
         height: 100vh;
       }
-      .cc-sidebar-brand { margin-bottom: 36px; padding: 0 6px; }
-      .cc-sidebar-brand img { height: 34px; width: auto; display: block; }
+      .cc-sidebar-brand { margin-bottom: 36px; padding: 0 6px; display: flex; justify-content: center; }
+      .cc-sidebar-brand img { height: 52px; width: auto; display: block; }
       .cc-sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
       .cc-nav-item {
         display: flex; align-items: center; gap: 10px;
@@ -1982,7 +1982,7 @@ function GlobalStyles() {
       }
       .cc-paper-footer-block { margin-top: auto; }
       .cc-paper-header { border-bottom: 2px solid var(--gray-150); padding-bottom: 14px; margin-bottom: 20px; }
-      .cc-paper-header img { height: 30px; }
+      .cc-paper-header img { height: 46px; }
       .cc-paper-title { text-align: center; font-size: 20px; margin-bottom: 18px; }
       .cc-paper-meta { display: flex; gap: 28px; font-size: 13px; margin-bottom: 20px; }
       .cc-paper-meta strong { font-weight: 700; }
