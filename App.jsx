@@ -32,9 +32,9 @@ const seedProtocols = [
         indications: "",
         expectedResult: "Abdômen mais firme, com melhor sustentação e qualidade de pele.",
         items: [
-          { procedureId: "proc_1", qty: "4–8", unit: "caixas", planBasico: true, planAvancado: true },
-          { procedureId: "proc_2", qty: "1–2", unit: "sessões", planBasico: false, planAvancado: true },
-          { procedureId: "proc_3", qty: "1–2", unit: "sessões", planBasico: true, planAvancado: true },
+          { procedureId: "proc_1", qty: "4–8", unit: "caixas", planInicial: true, planAvancado: true },
+          { procedureId: "proc_2", qty: "1–2", unit: "sessões", planInicial: false, planAvancado: true },
+          { procedureId: "proc_3", qty: "1–2", unit: "sessões", planInicial: true, planAvancado: true },
         ],
       },
     ],
@@ -63,7 +63,7 @@ function cloneProtocolPhases(protocol) {
     items: ph.items.map((it) => ({
       ...it,
       id: uid("it"),
-      planBasico: it.planBasico !== undefined ? it.planBasico : true,
+      planInicial: it.planInicial !== undefined ? it.planInicial : (it.planBasico !== undefined ? it.planBasico : true),
       planAvancado: it.planAvancado !== undefined ? it.planAvancado : true,
     })),
   }));
@@ -73,7 +73,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function defaultPlanPayments() {
   return {
-    planBasico: { mode: "parcelado", installments: 10, note: "" },
+    planInicial: { mode: "parcelado", installments: 10, note: "" },
     planAvancado: { mode: "parcelado", installments: 10, note: "" },
   };
 }
@@ -139,11 +139,28 @@ function rowToProcedure(r) {
   return { id: r.id, name: r.name, unit: r.unit, price: r.price, installments: r.installments, active: r.active };
 }
 
+function migrateItem(it) {
+  return {
+    ...it,
+    planInicial: it.planInicial !== undefined ? it.planInicial : (it.planBasico !== undefined ? it.planBasico : true),
+    planAvancado: it.planAvancado !== undefined ? it.planAvancado : true,
+  };
+}
+function migratePhases(phases) {
+  return (phases || []).map((ph) => ({ ...ph, items: (ph.items || []).map(migrateItem) }));
+}
+function migratePlanPayments(pp) {
+  if (!pp) return defaultPlanPayments();
+  const planInicial = pp.planInicial || pp.planBasico || { mode: "parcelado", installments: 10, note: "" };
+  const planAvancado = pp.planAvancado || { mode: "parcelado", installments: 10, note: "" };
+  return { planInicial, planAvancado };
+}
+
 function protocolToRow(p) {
   return { id: p.id, name: p.name, active: p.active, phases: p.phases || [] };
 }
 function rowToProtocol(r) {
-  return { id: r.id, name: r.name, active: r.active, phases: r.phases || [] };
+  return { id: r.id, name: r.name, active: r.active, phases: migratePhases(r.phases) };
 }
 
 function clinicToRow(c) {
@@ -187,8 +204,8 @@ function rowToProposal(r) {
     date: r.date,
     protocolId: r.protocol_id,
     status: r.status,
-    phases: r.phases || [],
-    planPayments: r.plan_payments || {},
+    phases: migratePhases(r.phases),
+    planPayments: migratePlanPayments(r.plan_payments),
     createdAt: r.created_at,
   };
 }
@@ -314,6 +331,24 @@ function parseQtyMax(qty) {
 }
 function isRange(qty) {
   return /[–-]/.test(String(qty)) && String(qty).match(/[\d.,]+/g)?.length > 1;
+}
+
+// Divide uma faixa "4–8" em [4, 8]. Um valor único "6" vira [6, 6].
+function splitQtyRange(qty) {
+  const nums = String(qty).match(/[\d.,]+/g);
+  if (!nums || !nums.length) return [0, 0];
+  const parsed = nums.map((n) => parseFloat(n.replace(",", ".")));
+  if (parsed.length === 1) return [parsed[0], parsed[0]];
+  return [parsed[0], parsed[parsed.length - 1]];
+}
+// planKey "planInicial" usa o primeiro número da faixa; "planAvancado" usa o segundo.
+function qtyForPlan(qty, planKey) {
+  const [first, second] = splitQtyRange(qty);
+  return planKey === "planInicial" ? first : second;
+}
+function formatQtyNumber(n) {
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(".", ",");
 }
 
 /* ---------------------------------------------------------------
@@ -636,7 +671,7 @@ function NewProposalWizard({ draft, setDraft, procedures, protocols, onCancel, o
     updatePhase(phaseId, {
       items: [
         ...draft.phases.find((p) => p.id === phaseId).items,
-        { id: uid("it"), procedureId: firstActive.id, qty: "1", unit: firstActive.unit, planBasico: true, planAvancado: true },
+        { id: uid("it"), procedureId: firstActive.id, qty: "1", unit: firstActive.unit, planInicial: true, planAvancado: true },
       ],
     });
   }
@@ -764,9 +799,6 @@ function NewProposalWizard({ draft, setDraft, procedures, protocols, onCancel, o
                   <Field label="O que essa fase faz">
                     <Textarea rows={2} value={phase.whatItDoes} onChange={(e) => updatePhase(phase.id, { whatItDoes: e.target.value })} />
                   </Field>
-                  <Field label="Indicações para você">
-                    <Textarea rows={2} value={phase.indications} onChange={(e) => updatePhase(phase.id, { indications: e.target.value })} />
-                  </Field>
                   <Field label="Resultado esperado">
                     <Textarea rows={2} value={phase.expectedResult} onChange={(e) => updatePhase(phase.id, { expectedResult: e.target.value })} />
                   </Field>
@@ -790,7 +822,7 @@ function NewProposalWizard({ draft, setDraft, procedures, protocols, onCancel, o
               <div><span>Paciente</span><strong>{draft.patientName || "—"}</strong></div>
               <div><span>Protocolo</span><strong>{protocol?.name || "—"}</strong></div>
               <div><span>Fases</span><strong>{draft.phases.length}</strong></div>
-              <div><span>Plano Básico</span><strong>{money(computePlanTotal(draft, procedures, "planBasico"))}</strong></div>
+              <div><span>Plano Inicial</span><strong>{money(computePlanTotal(draft, procedures, "planInicial"))}</strong></div>
               <div><span>Plano Avançado</span><strong>{money(computePlanTotal(draft, procedures, "planAvancado"))}</strong></div>
             </div>
           </div>
@@ -818,7 +850,7 @@ function computePlanTotal(draft, procedures, planKey) {
       if (!item[planKey]) continue;
       const proc = procedures.find((p) => p.id === item.procedureId);
       if (!proc) continue;
-      total += proc.price * parseQtyMax(item.qty);
+      total += proc.price * qtyForPlan(item.qty, planKey);
     }
   }
   return total;
@@ -860,7 +892,7 @@ function PlanConfigCard({ label, planKey, draft, setDraft, procedures }) {
         {includedItems.map((item) => {
           const proc = procedures.find((p) => p.id === item.procedureId);
           if (!proc) return null;
-          return <li key={item.id}>{proc.name} <span>({item.qty} {item.unit})</span></li>;
+          return <li key={item.id}>{proc.name} <span>({formatQtyNumber(qtyForPlan(item.qty, planKey))} {item.unit})</span></li>;
         })}
       </ul>
 
@@ -930,7 +962,7 @@ function InvestmentStep({ draft, setDraft, procedures }) {
             <th>Quantidade</th>
             <th>Unidade</th>
             <th>Valor unitário (referência)</th>
-            <th className="cc-plan-col">Básico</th>
+            <th className="cc-plan-col">Inicial</th>
             <th className="cc-plan-col">Avançado</th>
           </tr>
         </thead>
@@ -948,7 +980,7 @@ function InvestmentStep({ draft, setDraft, procedures }) {
                     <td>{item.unit}</td>
                     <td>{money(proc.price)}</td>
                     <td className="cc-plan-col">
-                      <input type="checkbox" checked={!!item.planBasico} onChange={() => toggleItemPlan(phase.id, item.id, "planBasico")} />
+                      <input type="checkbox" checked={!!item.planInicial} onChange={() => toggleItemPlan(phase.id, item.id, "planInicial")} />
                     </td>
                     <td className="cc-plan-col">
                       <input type="checkbox" checked={!!item.planAvancado} onChange={() => toggleItemPlan(phase.id, item.id, "planAvancado")} />
@@ -962,7 +994,7 @@ function InvestmentStep({ draft, setDraft, procedures }) {
       </table>
 
       <div className="cc-plan-cards">
-        <PlanConfigCard label="Plano Básico" planKey="planBasico" draft={draft} setDraft={setDraft} procedures={procedures} />
+        <PlanConfigCard label="Plano Inicial" planKey="planInicial" draft={draft} setDraft={setDraft} procedures={procedures} />
         <PlanConfigCard label="Plano Avançado" planKey="planAvancado" draft={draft} setDraft={setDraft} procedures={procedures} />
       </div>
     </div>
@@ -1081,7 +1113,7 @@ function PreviewView({ proposal, protocols, procedures, clinic, onBack, editable
 
           <div className="cc-paper-plans">
             {[
-              { key: "planBasico", label: "Plano Básico" },
+              { key: "planInicial", label: "Plano Inicial" },
               { key: "planAvancado", label: "Plano Avançado" },
             ].map(({ key, label }) => {
               const payment = proposal.planPayments?.[key] || { mode: "parcelado", installments: 10, note: "" };
@@ -1097,7 +1129,7 @@ function PreviewView({ proposal, protocols, procedures, clinic, onBack, editable
                       {items.map((item) => {
                         const proc = procedures.find((p) => p.id === item.procedureId);
                         if (!proc) return null;
-                        return <li key={item.id}>{proc.name} <span>({item.qty} {item.unit})</span></li>;
+                        return <li key={item.id}>{proc.name} <span>({formatQtyNumber(qtyForPlan(item.qty, key))} {item.unit})</span></li>;
                       })}
                     </ul>
                   )}
@@ -1303,7 +1335,7 @@ function ProtocolEditor({ protocol, procedures, onChange, onClose }) {
     const first = procedures.find((p) => p.active);
     if (!first) return;
     const phase = protocol.phases.find((p) => p.id === phaseId);
-    updatePhase(phaseId, { items: [...phase.items, { id: uid("it"), procedureId: first.id, qty: "1", unit: first.unit, planBasico: true, planAvancado: true }] });
+    updatePhase(phaseId, { items: [...phase.items, { id: uid("it"), procedureId: first.id, qty: "1", unit: first.unit, planInicial: true, planAvancado: true }] });
   }
   function updateItem(phaseId, itemId, patch) {
     const phase = protocol.phases.find((p) => p.id === phaseId);
@@ -1529,7 +1561,8 @@ export default function ClassyClinicApp() {
         setClinic(data.clinic || seedClinic);
         setProposals(data.proposals || [seedInitialProposal()]);
       } catch (err) {
-        setLoadError("Não foi possível carregar os dados salvos. Verifique a conexão com o Supabase.");
+        console.error("Erro ao carregar dados iniciais:", err);
+        setLoadError(`Não foi possível carregar os dados salvos. Detalhe: ${err.message || err}`);
       } finally {
         setLoading(false);
         ready.current = true;
