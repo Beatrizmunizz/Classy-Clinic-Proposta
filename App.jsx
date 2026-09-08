@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   LayoutDashboard, FileText, PlusCircle, Users, Layers, Settings,
   Search, Eye, Pencil, Copy, Printer, Trash2, ChevronLeft, ChevronRight,
@@ -90,6 +90,140 @@ function seedInitialProposal() {
     planPayments: defaultPlanPayments(),
     createdAt: "2026-08-17",
   };
+}
+
+/* ---------------------------------------------------------------
+   SUPABASE — chamadas diretas via fetch (sem precisar instalar nada)
+--------------------------------------------------------------- */
+const SUPABASE_URL = "https://ihvxyxydpbvcdhatxooe.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ibuwyXXd9zMSoQD-sGOZ4A_UVPKtVbj";
+
+async function sbRequest(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Supabase ${options.method || "GET"} ${path} falhou: ${res.status} ${text}`);
+  }
+  if (res.status === 204) return null;
+  return res.json().catch(() => null);
+}
+
+const sb = {
+  select: (table, query = "") => sbRequest(`${table}?select=*${query}`),
+  upsert: (table, rows) =>
+    sbRequest(table, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(rows),
+    }),
+  remove: (table, id) =>
+    sbRequest(`${table}?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }),
+};
+
+/* ---------------------------------------------------------------
+   SUPABASE — carregar/salvar dados
+   (procedimentos, protocolos, configurações da clínica e propostas)
+--------------------------------------------------------------- */
+function procedureToRow(p) {
+  return { id: p.id, name: p.name, unit: p.unit, price: p.price, installments: p.installments, active: p.active };
+}
+function rowToProcedure(r) {
+  return { id: r.id, name: r.name, unit: r.unit, price: r.price, installments: r.installments, active: r.active };
+}
+
+function protocolToRow(p) {
+  return { id: p.id, name: p.name, active: p.active, phases: p.phases || [] };
+}
+function rowToProtocol(r) {
+  return { id: r.id, name: r.name, active: r.active, phases: r.phases || [] };
+}
+
+function clinicToRow(c) {
+  return {
+    id: "main",
+    name: c.name,
+    instagram: c.instagram,
+    phone: c.phone,
+    email: c.email,
+    address: c.address,
+    validity_text: c.validityText,
+  };
+}
+function rowToClinic(r) {
+  return {
+    name: r.name,
+    instagram: r.instagram,
+    phone: r.phone,
+    email: r.email,
+    address: r.address,
+    validityText: r.validity_text,
+  };
+}
+
+function proposalToRow(p) {
+  return {
+    id: p.id,
+    patient_name: p.patientName,
+    date: p.date,
+    protocol_id: p.protocolId,
+    status: p.status,
+    phases: p.phases || [],
+    plan_payments: p.planPayments || {},
+    created_at: p.createdAt,
+  };
+}
+function rowToProposal(r) {
+  return {
+    id: r.id,
+    patientName: r.patient_name,
+    date: r.date,
+    protocolId: r.protocol_id,
+    status: r.status,
+    phases: r.phases || [],
+    planPayments: r.plan_payments || {},
+    createdAt: r.created_at,
+  };
+}
+
+async function loadAllData() {
+  const [procRows, protRows, clinicRows, propRows] = await Promise.all([
+    sb.select("procedures"),
+    sb.select("protocols"),
+    sb.select("clinic_settings", "&id=eq.main"),
+    sb.select("proposals", "&order=created_at.desc"),
+  ]);
+
+  return {
+    procedures: procRows && procRows.length ? procRows.map(rowToProcedure) : null,
+    protocols: protRows && protRows.length ? protRows.map(rowToProtocol) : null,
+    clinic: clinicRows && clinicRows.length ? rowToClinic(clinicRows[0]) : null,
+    proposals: propRows && propRows.length ? propRows.map(rowToProposal) : null,
+  };
+}
+
+async function seedSupabaseIfEmpty(existing) {
+  const tasks = [];
+  if (!existing.procedures) {
+    tasks.push(sb.upsert("procedures", seedProcedures.map(procedureToRow)));
+  }
+  if (!existing.protocols) {
+    tasks.push(sb.upsert("protocols", seedProtocols.map(protocolToRow)));
+  }
+  if (!existing.clinic) {
+    tasks.push(sb.upsert("clinic_settings", [clinicToRow(seedClinic)]));
+  }
+  if (!existing.proposals) {
+    tasks.push(sb.upsert("proposals", [seedInitialProposal()].map(proposalToRow)));
+  }
+  if (tasks.length) await Promise.all(tasks);
 }
 
 /* ---------------------------------------------------------------
@@ -1371,14 +1505,60 @@ export default function ClassyClinicApp() {
   const [user] = useState({ name: "Equipe Classy Clinic", role: "Uso interno" });
   const [view, setView] = useState("dashboard");
 
-  const [procedures, setProcedures] = useState(seedProcedures);
-  const [protocols, setProtocols] = useState(seedProtocols);
+  const [procedures, setProcedures] = useState([]);
+  const [protocols, setProtocols] = useState([]);
   const [clinic, setClinic] = useState(seedClinic);
-  const [proposals, setProposals] = useState([seedInitialProposal()]);
+  const [proposals, setProposals] = useState([]);
 
   const [draft, setDraft] = useState(null);
   const [previewing, setPreviewing] = useState(null);
   const [editingProposalId, setEditingProposalId] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const ready = useRef(false); // vira true só depois que os dados iniciais chegam do Supabase
+
+  // Carrega tudo do Supabase quando o site abre
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await loadAllData();
+        await seedSupabaseIfEmpty(data);
+        setProcedures(data.procedures || seedProcedures);
+        setProtocols(data.protocols || seedProtocols);
+        setClinic(data.clinic || seedClinic);
+        setProposals(data.proposals || [seedInitialProposal()]);
+      } catch (err) {
+        setLoadError("Não foi possível carregar os dados salvos. Verifique a conexão com o Supabase.");
+      } finally {
+        setLoading(false);
+        ready.current = true;
+      }
+    })();
+  }, []);
+
+  // A partir do momento em que os dados carregam, qualquer alteração
+  // nessas listas é automaticamente salva no Supabase.
+  useEffect(() => {
+    if (!ready.current || !procedures.length) return;
+    sb.upsert("procedures", procedures.map(procedureToRow)).catch((err) =>
+      console.error("Erro ao salvar procedimentos:", err)
+    );
+  }, [procedures]);
+
+  useEffect(() => {
+    if (!ready.current || !protocols.length) return;
+    sb.upsert("protocols", protocols.map(protocolToRow)).catch((err) =>
+      console.error("Erro ao salvar protocolos:", err)
+    );
+  }, [protocols]);
+
+  useEffect(() => {
+    if (!ready.current) return;
+    sb.upsert("clinic_settings", [clinicToRow(clinic)]).catch((err) =>
+      console.error("Erro ao salvar dados da clínica:", err)
+    );
+  }, [clinic]);
 
   function startNewProposal() {
     setDraft({ id: null, patientName: "", date: today(), protocolId: "", status: "Rascunho", phases: [], planPayments: defaultPlanPayments() });
@@ -1398,11 +1578,17 @@ export default function ClassyClinicApp() {
     copy.date = today();
     copy.status = "Rascunho";
     setProposals((list) => [copy, ...list]);
+    sb.upsert("proposals", [proposalToRow(copy)]).catch((err) =>
+      console.error("Erro ao salvar proposta duplicada:", err)
+    );
   }
 
   function deleteProposal(p) {
     if (window.confirm(`Excluir a proposta de ${p.patientName}?`)) {
       setProposals((list) => list.filter((x) => x.id !== p.id));
+      sb.remove("proposals", p.id).catch((err) =>
+        console.error("Erro ao excluir proposta:", err)
+      );
     }
   }
 
@@ -1417,6 +1603,9 @@ export default function ClassyClinicApp() {
       const exists = list.some((p) => p.id === finalProposal.id);
       return exists ? list.map((p) => (p.id === finalProposal.id ? finalProposal : p)) : [finalProposal, ...list];
     });
+    sb.upsert("proposals", [proposalToRow(finalProposal)]).catch((err) =>
+      console.error("Erro ao salvar proposta:", err)
+    );
     setPreviewing(finalProposal);
     setView("preview");
   }
@@ -1428,6 +1617,33 @@ export default function ClassyClinicApp() {
   function pdfProposal(p) {
     setPreviewing(p);
     setView("preview");
+  }
+
+  if (loading) {
+    return (
+      <>
+        <GlobalStyles />
+        <div className="cc-app" style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
+          <div style={{ textAlign: "center", color: "var(--gray-500, #888)" }}>
+            <Loader2 size={28} style={{ animation: "cc-spin 0.8s linear infinite" }} />
+            <p style={{ marginTop: 12 }}>Carregando dados salvos...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <>
+        <GlobalStyles />
+        <div className="cc-app" style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
+          <div style={{ textAlign: "center", maxWidth: 420 }}>
+            <p>{loadError}</p>
+          </div>
+        </div>
+      </>
+    );
   }
 
   if (view === "preview" && previewing) {
