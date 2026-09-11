@@ -1983,7 +1983,7 @@ function GlobalStyles() {
       }
       .cc-paper > *:not(.cc-paper-watermark) { position: relative; z-index: 1; }
       .cc-paper-watermark {
-        position: absolute; top: 50%; left: 52%; width: 62%;
+        position: absolute; top: 50%; left: 50%; width: 72%;
         transform: translate(-50%, -50%);
         opacity: 0.05; z-index: 0; pointer-events: none;
       }
