@@ -79,6 +79,10 @@ function defaultPlanPayments() {
   };
 }
 
+function defaultPlansToShow() {
+  return { planInicial: true, planAvancado: true };
+}
+
 function seedInitialProposal() {
   const protocol = seedProtocols[0];
   return {
@@ -89,6 +93,7 @@ function seedInitialProposal() {
     status: "Proposta criada",
     phases: cloneProtocolPhases(protocol),
     planPayments: defaultPlanPayments(),
+    plansToShow: defaultPlansToShow(),
     createdAt: "2026-08-17",
   };
 }
@@ -195,6 +200,7 @@ function proposalToRow(p) {
     status: p.status,
     phases: p.phases || [],
     plan_payments: p.planPayments || {},
+    plans_to_show: p.plansToShow || defaultPlansToShow(),
     created_at: p.createdAt,
   };
 }
@@ -207,6 +213,7 @@ function rowToProposal(r) {
     status: r.status,
     phases: migratePhases(r.phases),
     planPayments: migratePlanPayments(r.plan_payments),
+    plansToShow: r.plans_to_show || defaultPlansToShow(),
     createdAt: r.created_at,
   };
 }
@@ -952,9 +959,33 @@ function InvestmentStep({ draft, setDraft, procedures }) {
     }));
   }
 
+  function togglePlanVisibility(planKey) {
+    setDraft((d) => {
+      const current = d.plansToShow || defaultPlansToShow();
+      const next = { ...current, [planKey]: !current[planKey] };
+      // nunca deixa os dois desmarcados — sempre pelo menos um plano visível
+      if (!next.planInicial && !next.planAvancado) return d;
+      return { ...d, plansToShow: next };
+    });
+  }
+
+  const plansToShow = draft.plansToShow || defaultPlansToShow();
+
   return (
     <div className="cc-investment-step">
       <p className="cc-finish-lead">Marque em quais planos cada procedimento entra. O valor de cada plano é somado automaticamente.</p>
+
+      <div className="cc-plans-visibility">
+        <span className="cc-plans-visibility-label">Quais planos aparecem nesta proposta?</span>
+        <label className="cc-checkbox-label">
+          <input type="checkbox" checked={!!plansToShow.planInicial} onChange={() => togglePlanVisibility("planInicial")} />
+          Plano Inicial
+        </label>
+        <label className="cc-checkbox-label">
+          <input type="checkbox" checked={!!plansToShow.planAvancado} onChange={() => togglePlanVisibility("planAvancado")} />
+          Plano Avançado
+        </label>
+      </div>
 
       <table className="cc-table cc-invest-table">
         <thead>
@@ -995,8 +1026,12 @@ function InvestmentStep({ draft, setDraft, procedures }) {
       </table>
 
       <div className="cc-plan-cards">
-        <PlanConfigCard label="Plano Inicial" planKey="planInicial" draft={draft} setDraft={setDraft} procedures={procedures} />
-        <PlanConfigCard label="Plano Avançado" planKey="planAvancado" draft={draft} setDraft={setDraft} procedures={procedures} />
+        {plansToShow.planInicial && (
+          <PlanConfigCard label="Plano Inicial" planKey="planInicial" draft={draft} setDraft={setDraft} procedures={procedures} />
+        )}
+        {plansToShow.planAvancado && (
+          <PlanConfigCard label="Plano Avançado" planKey="planAvancado" draft={draft} setDraft={setDraft} procedures={procedures} />
+        )}
       </div>
     </div>
   );
@@ -1118,7 +1153,7 @@ function PreviewView({ proposal, protocols, procedures, clinic, onBack, editable
             {[
               { key: "planInicial", label: "Plano Inicial" },
               { key: "planAvancado", label: "Plano Avançado" },
-            ].map(({ key, label }) => {
+            ].filter(({ key }) => (proposal.plansToShow || defaultPlansToShow())[key]).map(({ key, label }) => {
               const payment = proposal.planPayments?.[key] || { mode: "parcelado", installments: 10, note: "" };
               const total = computePlanTotal(proposal, procedures, key);
               const items = proposal.phases.flatMap((ph) => ph.items.filter((it) => it[key]));
@@ -1597,7 +1632,7 @@ export default function ClassyClinicApp() {
   }, [clinic]);
 
   function startNewProposal() {
-    setDraft({ id: null, patientName: "", date: today(), protocolId: "", status: "Rascunho", phases: [], planPayments: defaultPlanPayments() });
+    setDraft({ id: null, patientName: "", date: today(), protocolId: "", status: "Rascunho", phases: [], planPayments: defaultPlanPayments(), plansToShow: defaultPlansToShow() });
     setEditingProposalId(null);
     setView("new-proposal");
   }
@@ -1923,7 +1958,11 @@ function GlobalStyles() {
       .cc-invest-table th, .cc-invest-table td { font-size: 13px; }
       .cc-plan-col { text-align: center; width: 70px; }
       .cc-invest-phase-row td { background: var(--gray-100); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-500); padding: 8px 10px; }
+      .cc-plans-visibility { display: flex; align-items: center; gap: 20px; background: var(--offwhite); border: 1px solid var(--gray-150); border-radius: 4px; padding: 12px 16px; margin-bottom: 18px; }
+      .cc-plans-visibility-label { font-size: 13px; font-weight: 600; color: var(--black-soft); }
+      .cc-checkbox-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
       .cc-plan-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 24px; }
+      .cc-plan-cards:has(> :only-child) { grid-template-columns: 1fr; }
       .cc-plan-card { border: 1px solid var(--gray-150); border-radius: 4px; padding: 18px 20px; background: var(--offwhite); }
       .cc-plan-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
       .cc-plan-card-head h3 { font-size: 18px; }
@@ -2015,6 +2054,7 @@ function GlobalStyles() {
       .cc-paper-table tfoot td { font-weight: 700; border-top: 2px solid var(--graphite); border-bottom: none; padding-top: 14px; }
 
       .cc-paper-plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 8px; page-break-inside: avoid; }
+      .cc-paper-plans:has(> :only-child) { grid-template-columns: 1fr; }
       .cc-paper-plan { border: 1px solid #B7B2A8; border-radius: 3px; padding: 20px 22px; }
       .cc-paper-plan h5 { font-family: var(--paper-font); font-size: 17px; font-weight: 700; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid #B7B2A8; }
       .cc-paper-plan ul { list-style: none; padding: 0; margin: 0 0 18px; display: flex; flex-direction: column; gap: 9px; font-size: 12px; }
