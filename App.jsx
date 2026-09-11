@@ -2024,7 +2024,8 @@ function GlobalStyles() {
       .cc-paper-watermark {
         position: absolute; top: 50%; left: 50%; width: 72%;
         transform: translate(-50%, -50%);
-        opacity: 0.05; z-index: 0; pointer-events: none;
+        opacity: 0.12; z-index: 0; pointer-events: none;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
       }
       .cc-paper-watermark img { width: 100%; height: auto; display: block; }
       .cc-paper h1, .cc-paper h2, .cc-paper h3, .cc-paper h4, .cc-paper h5 {
@@ -2068,6 +2069,13 @@ function GlobalStyles() {
         .cc-paper { box-shadow: none; width: auto; min-height: 0; padding: 12mm 14mm; }
         .cc-page-break { page-break-before: always; }
         body { background: white; }
+        .cc-paper-watermark {
+          opacity: 0.22 !important;
+          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+        }
+        .cc-paper-watermark img {
+          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+        }
       }
 
       @media (max-width: 900px) {
