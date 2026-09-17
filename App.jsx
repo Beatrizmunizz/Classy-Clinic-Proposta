@@ -429,6 +429,7 @@ function Sidebar({ view, setView, user }) {
   const items = [
     { key: "proposals", label: "Propostas", icon: FileText },
     { key: "new-proposal", label: "Nova proposta", icon: PlusCircle },
+    { key: "planejamento", label: "Planejamento", icon: ClipboardList },
     { key: "patients", label: "Pacientes", icon: Users },
     { key: "procedures", label: "Procedimentos", icon: ClipboardList },
     { key: "protocols", label: "Protocolos", icon: Layers },
@@ -1737,9 +1738,18 @@ export default function ClassyClinicApp() {
       <GlobalStyles />
       <div className="cc-app">
         <Sidebar view={view} setView={(v) => { if (v === "new-proposal") { startNewProposal(); } else { setView(v); } }} user={user} />
-        <main className="cc-main">
+        <main className={`cc-main${view === "planejamento" ? " cc-main-full" : ""}`}>
           {view === "dashboard" && (
             <DashboardView proposals={proposals} setView={setView} startNewProposal={startNewProposal} user={user} />
+          )}
+          {view === "planejamento" && (
+            <div className="cc-planejamento-frame">
+              <iframe
+                src="/planejamento-clinico.html"
+                title="Gerador de Planejamento"
+                className="cc-planejamento-iframe"
+              />
+            </div>
           )}
           {view === "proposals" && (
             <ProposalsListView
@@ -1848,6 +1858,9 @@ function GlobalStyles() {
 
       /* MAIN */
       .cc-main { flex: 1; padding: 40px 48px 80px; max-width: 1180px; }
+      .cc-main-full { max-width: none; padding: 0; }
+      .cc-planejamento-frame { height: 100vh; }
+      .cc-planejamento-iframe { width: 100%; height: 100%; border: none; display: block; }
       .cc-page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; gap: 16px; flex-wrap: wrap; }
       .cc-h1 { font-size: 30px; color: var(--black-soft); }
       .cc-sub { color: var(--gray-500); font-size: 13.5px; margin: 6px 0 0; }
