@@ -238,7 +238,7 @@
 
   <div id="dataPanel" class="open">
     <h3>Dados da consulta</h3>
-    <p>A data já vem preenchida sozinha. Cole o relato da paciente com suas palavras — o sistema separa automaticamente entre queixa principal e histórico clínico. Clique em "Gerar planejamento" para atualizar as telas.</p>
+    <p>A data já vem preenchida sozinha. Preencha a queixa principal e o histórico clínico separadamente. Clique em "Gerar planejamento" para atualizar as telas.</p>
     <div class="form-grid">
       <div class="form-item">
         <label>Nome da paciente</label>
@@ -258,8 +258,14 @@
     </div>
     <div class="form-grid">
       <div class="form-item wide" style="flex:1 1 100%;">
-        <label>O que a paciente relatou <span class="hint">(cole em texto livre — o sistema separa sozinho)</span></label>
-        <textarea id="formRelato" rows="4" placeholder="Ex.: Se incomoda com a flacidez na região abdominal, principalmente perto do umbigo. Faz uso do DIU há 2 anos e tem alergia a dipirona.">Se incomoda com a flacidez na região abdominal. Paciente faz uso do DIU.</textarea>
+        <label>Queixa principal <span class="hint">(uma por linha)</span></label>
+        <textarea id="formQueixa" rows="3" placeholder="Ex.: Se incomoda com a flacidez na região abdominal, principalmente perto do umbigo.">Se incomoda com a flacidez na região abdominal.</textarea>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-item wide" style="flex:1 1 100%;">
+        <label>Histórico clínico <span class="hint">(uma por linha)</span></label>
+        <textarea id="formHistorico" rows="3" placeholder="Ex.: Faz uso do DIU há 2 anos. Tem alergia a dipirona.">Paciente faz uso do DIU.</textarea>
       </div>
     </div>
     <div class="form-grid">
@@ -417,30 +423,6 @@
     return items.map(l => `<li>${escapeHtml(l)}</li>`).join('');
   }
 
-  // ---- classificador automático: separa o relato em queixa principal x histórico clínico ----
-  const HISTORY_PATTERNS = [
-    /uso de/i, /faz uso/i, /alerg/i, /cirurgi/i, /medicament/i, /rem[eé]dio/i,
-    /diagnostic/i, /hist[oó]rico/i, /gestante/i, /gravidez/i, /amamenta/i,
-    /diabete/i, /hipertens/i, /tireoide/i, /anticoncepcional/i, /\bdiu\b/i,
-    /doen[cç]a/i, /tratamento anterior/i, /procedimento anterior/i, /cicatriz/i,
-    /press[aã]o alta/i, /colesterol/i, /tabagis/i, /fumante/i, /cardiopat/i,
-    /renal/i, /hep[aá]tic/i, /autoimune/i, /c[aâ]ncer/i, /quimioterapia/i,
-    /implante/i, /pr[oó]tese/i, /marca-?passo/i, /convuls[aã]o/i, /epileps/i,
-    /\basma\b/i, /\btoma\b/i, /faz tratamento/i, /engravidou/i, /parto/i, /cesárea/i
-  ];
-  function classifyReport(text){
-    const parts = text
-      .split(/\n+|(?<=[.;])\s+/)
-      .map(s => s.trim())
-      .filter(Boolean);
-    const queixa = [], historico = [];
-    parts.forEach(p => {
-      const isHistory = HISTORY_PATTERNS.some(rx => rx.test(p));
-      (isHistory ? historico : queixa).push(p.replace(/[.;]+$/,''));
-    });
-    return { queixa, historico };
-  }
-
   function generatePlan(){
     const nome = document.getElementById('formNome').value.trim().toUpperCase();
     document.getElementById('eyebrowName').textContent = nome || 'NOME DA PACIENTE';
@@ -449,12 +431,10 @@
     document.getElementById('areaSelect').value = area;
     syncLabel(area);
 
-    const relato = document.getElementById('formRelato').value;
-    const { queixa, historico } = classifyReport(relato);
-    document.getElementById('queixaList').innerHTML =
-      queixa.length ? queixa.map(l => `<li>${escapeHtml(l)}</li>`).join('') : '<li></li>';
-    document.getElementById('historicoList').innerHTML =
-      historico.length ? historico.map(l => `<li>${escapeHtml(l)}</li>`).join('') : '<li></li>';
+    const queixaText = document.getElementById('formQueixa').value;
+    const historicoText = document.getElementById('formHistorico').value;
+    document.getElementById('queixaList').innerHTML = linesToList(queixaText, '');
+    document.getElementById('historicoList').innerHTML = linesToList(historicoText, '');
 
     syncDate();
   }
