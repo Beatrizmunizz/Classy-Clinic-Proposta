@@ -221,7 +221,7 @@
       <button class="btn primary" onclick="toggleDataPanel()">Dados da consulta</button>
       <button class="btn" onclick="toggleBrandPanel()">Fotos fixas da marca</button>
       <button class="btn" id="toggleEditBtn" onclick="toggleEdit()">Travar edição</button>
-      <button class="btn" onclick="window.print()">Baixar / Imprimir PDF</button>
+      <button class="btn" id="downloadPdfBtn" onclick="downloadPlanPdf()">Baixar PDF</button>
       <button class="btn primary" onclick="enterPresent()">Apresentar</button>
     </div>
   </div>
@@ -562,6 +562,74 @@
     if(e.key === 'ArrowLeft') navSlide(-1);
     if(e.key === 'Escape') exitPresent();
   });
+
+  // ---- geração de PDF fiel aos slides (mesma técnica do gerador de propostas) ----
+  function loadPdfScriptOnce(src){
+    return new Promise((resolve, reject) => {
+      if(document.querySelector(`script[data-plan-src="${src}"]`)){ resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.dataset.planSrc = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Falha de rede ao carregar ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function ensurePlanPdfLibs(){
+    if(!window.html2canvas){
+      await loadPdfScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    }
+    if(!window.jspdf){
+      await loadPdfScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+    if(!window.html2canvas || !window.jspdf){
+      throw new Error('As bibliotecas de geração de PDF não ficaram disponíveis neste ambiente.');
+    }
+  }
+
+  async function downloadPlanPdf(){
+    const btn = document.getElementById('downloadPdfBtn');
+    const originalLabel = btn.textContent;
+    const wasEditing = document.body.classList.contains('edit-mode');
+    const wasPresenting = document.body.classList.contains('present-mode');
+    btn.textContent = 'Gerando PDF…';
+    btn.disabled = true;
+    document.body.classList.remove('edit-mode');
+    document.body.classList.remove('present-mode');
+    try{
+      await ensurePlanPdfLibs();
+      const { jsPDF } = window.jspdf;
+      const slideEls = Array.from(document.querySelectorAll('.slide'));
+      let doc;
+      for(let i = 0; i < slideEls.length; i++){
+        const el = slideEls[i];
+        const canvas = await window.html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          windowWidth: Math.max(document.documentElement.clientWidth, 1400),
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        if(i === 0){
+          doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height], compress: true });
+        } else {
+          doc.addPage([canvas.width, canvas.height], 'landscape');
+        }
+        doc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      }
+      const nomeBruto = (document.getElementById('formNome').value || 'paciente').trim();
+      const nomeArquivo = nomeBruto.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') || 'paciente';
+      const dataArquivo = (mainDateInput.value || todayIso);
+      doc.save(`Planejamento_${nomeArquivo}_${dataArquivo}.pdf`);
+    } catch(err){
+      alert('Não foi possível gerar o PDF agora. ' + (err && err.message ? err.message : 'Tente novamente em instantes.'));
+    } finally {
+      btn.textContent = originalLabel;
+      btn.disabled = false;
+      if(wasEditing) document.body.classList.add('edit-mode');
+      if(wasPresenting) document.body.classList.add('present-mode');
+    }
+  }
 </script>
 </body>
 </html>
