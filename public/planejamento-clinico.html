@@ -105,18 +105,43 @@
 
   /* ---------- Patient photo slots (change every visit) ---------- */
   .photo-slot{
-    position:relative; background:#efe6df center/cover no-repeat;
+    position:relative; background:#efe6df; overflow:hidden;
     display:flex; align-items:center; justify-content:center; border:1px dashed rgba(60,14,24,0.3);
   }
+  .photo-slot .ph-img{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 50%;
+    display:none; transform-origin:center center; user-select:none; -webkit-user-drag:none;
+  }
+  .photo-slot.has-img .ph-img{ display:block; }
+  body.edit-mode .photo-slot.has-img{ cursor:grab; }
+  body.edit-mode .photo-slot.has-img:active{ cursor:grabbing; }
   .photo-slot .ph-label{
     font-size:11px; letter-spacing:.04em; color:#8a7a72; display:flex; flex-direction:column;
-    align-items:center; gap:4px; pointer-events:none; text-align:center; padding:0 8px;
+    align-items:center; gap:4px; pointer-events:none; text-align:center; padding:0 8px; position:relative; z-index:1;
   }
   .photo-slot.has-img .ph-label{ display:none; }
-  .photo-slot input[type="file"]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .photo-slot > input[type="file"]{ position:absolute; inset:0; opacity:0; cursor:pointer; z-index:1; }
+  .photo-slot.has-img > input[type="file"]{ display:none; }
   body:not(.edit-mode) .photo-slot input[type="file"]{ display:none; }
   body:not(.edit-mode) .photo-slot{ border:none; }
   .ph-icon{ font-size:18px; opacity:.6; }
+  .ph-replace{
+    position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%;
+    background:rgba(20,10,10,0.5); color:#fff; font-size:13px; align-items:center; justify-content:center;
+    cursor:pointer; z-index:3; display:none;
+  }
+  .photo-slot.has-img .ph-replace{ display:flex; }
+  body:not(.edit-mode) .ph-replace{ display:none !important; }
+  .ph-replace input[type="file"]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .ph-zoom-wrap{
+    position:absolute; left:8px; right:8px; bottom:8px; display:none; align-items:center; gap:8px;
+    z-index:3; background:rgba(20,10,10,0.45); border-radius:20px; padding:5px 12px;
+  }
+  .photo-slot.has-img .ph-zoom-wrap{ display:flex; }
+  body:not(.edit-mode) .ph-zoom-wrap{ display:none !important; }
+  .ph-zoom-wrap span{ font-size:12px; color:#fff; line-height:1; }
+  .ph-zoom-wrap input[type="range"]{ flex:1; accent-color:#c6a06a; height:14px; }
+  @media print{ .ph-replace, .ph-zoom-wrap{ display:none !important; } }
 
   /* ================= SLIDE 1 — CAPA (foto fixa da marca) ================= */
   #slide1{
@@ -159,9 +184,12 @@
   .s2-divider{ width:1px; background:rgba(92,21,35,0.16); align-self:stretch; }
   .field-label{ text-transform:uppercase; letter-spacing:.14em; font-weight:600; font-size:clamp(10px,0.95vw,12px); margin-bottom:16px; color:#5c1523; }
   .bullet-list{ list-style:none; margin:0; padding:0; font-family:'Cormorant Garamond', serif; font-size:clamp(14px,1.7vw,19px); line-height:1.7; color:#2c1f1f; }
-  .bullet-list li{ position:relative; padding-left:16px; margin-bottom:10px; }
+  .bullet-list li{ position:relative; padding-left:16px; margin-bottom:10px; break-inside:avoid; }
   .bullet-list li::before{ content:'—'; position:absolute; left:0; color:#5c1523; opacity:.55; }
   #slide2 .meta-wrap{ position:absolute; left:5%; bottom:3.5%; color:#8a7a72; }
+  /* quando a lista cresce demais para caber na altura disponível, ela reflui em 2 colunas em vez de vazar a página */
+  .field-block.s2-compact{ overflow:hidden; align-self:flex-start; }
+  .field-block.s2-compact .bullet-list{ column-count:2; column-gap:24px; column-fill:auto; height:100%; }
 
   /* ================= SLIDE 3 — ANÁLISE 360º ================= */
   #slide3{ background:var(--paper); color:var(--ink); display:flex; flex-direction:column; }
@@ -356,16 +384,25 @@
       </div>
       <div class="photos-row">
         <div class="photo-slot" id="slotAnalise1">
+          <img class="ph-img" alt="">
           <div class="ph-label"><span class="ph-icon">＋</span>Foto</div>
           <input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise1')">
+          <label class="ph-replace" title="Trocar foto">⟳<input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise1')"></label>
+          <div class="ph-zoom-wrap"><span>🔍</span><input type="range" min="100" max="250" value="100" oninput="setPhotoZoom('slotAnalise1', this.value)"></div>
         </div>
         <div class="photo-slot" id="slotAnalise2">
+          <img class="ph-img" alt="">
           <div class="ph-label"><span class="ph-icon">＋</span>Foto</div>
           <input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise2')">
+          <label class="ph-replace" title="Trocar foto">⟳<input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise2')"></label>
+          <div class="ph-zoom-wrap"><span>🔍</span><input type="range" min="100" max="250" value="100" oninput="setPhotoZoom('slotAnalise2', this.value)"></div>
         </div>
         <div class="photo-slot" id="slotAnalise3">
+          <img class="ph-img" alt="">
           <div class="ph-label"><span class="ph-icon">＋</span>Foto</div>
           <input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise3')">
+          <label class="ph-replace" title="Trocar foto">⟳<input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise3')"></label>
+          <div class="ph-zoom-wrap"><span>🔍</span><input type="range" min="100" max="250" value="100" oninput="setPhotoZoom('slotAnalise3', this.value)"></div>
         </div>
       </div>
       <div class="meta-wrap meta">
@@ -437,7 +474,54 @@
     document.getElementById('historicoList').innerHTML = linesToList(historicoText, '');
 
     syncDate();
+    fitSlide2Content();
   }
+
+  // ---- evita que a lista de queixa/histórico vaze da página: se não couber na altura,
+  // reflui automaticamente em 2 colunas dentro do próprio bloco ----
+  function fitSlide2Content(){
+    const slide = document.getElementById('slide2');
+    const wrap = slide && slide.querySelector('.s2-wrap');
+    const header = slide && slide.querySelector('.s2-header');
+    const metaEl = slide && slide.querySelector('.meta-wrap');
+    const blocks = slide ? Array.from(slide.querySelectorAll('.field-block')) : [];
+    if(!slide || !wrap || !header || !blocks.length) return;
+
+    blocks.forEach(fb => {
+      fb.classList.remove('s2-compact');
+      fb.style.height = '';
+      fb.style.maxHeight = '';
+    });
+
+    const slideRect = slide.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const metaH = metaEl ? metaEl.getBoundingClientRect().height : 0;
+    const safety = slideRect.height * 0.06;
+    const headerH = header.getBoundingClientRect().height;
+    const gapPx = parseFloat(getComputedStyle(wrap).rowGap || getComputedStyle(wrap).gap || '0') || 0;
+    const available = slideRect.height - (wrapRect.top - slideRect.top) - metaH - safety - headerH - gapPx;
+    if(available < 60) return;
+
+    blocks.forEach(fb => {
+      const h = fb.getBoundingClientRect().height;
+      if(h > available){
+        fb.classList.add('s2-compact');
+        fb.style.height = available + 'px';
+        fb.style.maxHeight = available + 'px';
+      }
+    });
+  }
+  window.addEventListener('resize', () => {
+    clearTimeout(window.__s2ResizeTimer);
+    window.__s2ResizeTimer = setTimeout(fitSlide2Content, 150);
+  });
+  ['queixaList','historicoList'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => {
+      clearTimeout(window.__s2InputTimer);
+      window.__s2InputTimer = setTimeout(fitSlide2Content, 200);
+    });
+  });
   function handleBrandPhoto(event, which){
     const file = event.target.files[0];
     if(!file) return;
@@ -477,18 +561,31 @@
   mainDateInput.value = todayIso;
   mainDateInput.addEventListener('input', syncDate);
   syncDate();
+  setTimeout(fitSlide2Content, 0);
 
-  // ---- per-patient photo upload (slides 2 & 3) ----
+  // ---- per-patient photo upload (slides 2 & 3), com zoom e reposicionamento ----
+  function setPhotoImage(slotId, dataUrl){
+    const slot = document.getElementById(slotId);
+    if(!slot) return;
+    const img = slot.querySelector('.ph-img');
+    img.src = dataUrl;
+    img.dataset.zoom = '100';
+    img.dataset.px = '50';
+    img.dataset.py = '50';
+    img.style.objectPosition = '50% 50%';
+    img.style.transform = 'scale(1)';
+    const zoomSlider = slot.querySelector('.ph-zoom-wrap input[type="range"]');
+    if(zoomSlider) zoomSlider.value = 100;
+    slot.classList.add('has-img');
+  }
+
   function handlePhoto(event, slotId){
     const file = event.target.files[0];
     if(!file) return;
     const reader = new FileReader();
-    reader.onload = function(e){
-      const slot = document.getElementById(slotId);
-      slot.style.backgroundImage = `url(${e.target.result})`;
-      slot.classList.add('has-img');
-    };
+    reader.onload = e => setPhotoImage(slotId, e.target.result);
     reader.readAsDataURL(file);
+    event.target.value = '';
   }
 
   // ---- upload múltiplo: distribui as fotos escolhidas nos slots, na ordem selecionada ----
@@ -496,14 +593,56 @@
     const files = Array.from(event.target.files).slice(0, slotIds.length);
     files.forEach((file, i) => {
       const reader = new FileReader();
-      reader.onload = function(e){
-        const slot = document.getElementById(slotIds[i]);
-        slot.style.backgroundImage = `url(${e.target.result})`;
-        slot.classList.add('has-img');
-      };
+      reader.onload = e => setPhotoImage(slotIds[i], e.target.result);
       reader.readAsDataURL(file);
     });
+    event.target.value = '';
   }
+
+  // ---- ajuste fino da foto: zoom (slider) e arraste para reposicionar ----
+  function setPhotoZoom(slotId, value){
+    const slot = document.getElementById(slotId);
+    const img = slot && slot.querySelector('.ph-img');
+    if(!img) return;
+    img.dataset.zoom = value;
+    img.style.transform = `scale(${value / 100})`;
+  }
+
+  function initPhotoDrag(slotId){
+    const slot = document.getElementById(slotId);
+    const img = slot && slot.querySelector('.ph-img');
+    if(!slot || !img) return;
+    let dragging = false, startX = 0, startY = 0, startPx = 50, startPy = 50;
+
+    slot.addEventListener('pointerdown', (e) => {
+      if(!document.body.classList.contains('edit-mode')) return;
+      if(!slot.classList.contains('has-img')) return;
+      if(e.target.closest('.ph-replace') || e.target.closest('.ph-zoom-wrap')) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startPx = parseFloat(img.dataset.px || '50');
+      startPy = parseFloat(img.dataset.py || '50');
+      slot.setPointerCapture(e.pointerId);
+    });
+    slot.addEventListener('pointermove', (e) => {
+      if(!dragging) return;
+      const rect = slot.getBoundingClientRect();
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      let px = startPx - (dx / rect.width) * 100;
+      let py = startPy - (dy / rect.height) * 100;
+      px = Math.max(0, Math.min(100, px));
+      py = Math.max(0, Math.min(100, py));
+      img.dataset.px = px;
+      img.dataset.py = py;
+      img.style.objectPosition = `${px}% ${py}%`;
+    });
+    const endDrag = () => { dragging = false; };
+    slot.addEventListener('pointerup', endDrag);
+    slot.addEventListener('pointercancel', endDrag);
+    slot.addEventListener('pointerleave', endDrag);
+  }
+  ['slotAnalise1','slotAnalise2','slotAnalise3'].forEach(initPhotoDrag);
 
   // ---- edit mode toggle ----
   function toggleEdit(){
@@ -586,6 +725,7 @@
     btn.disabled = true;
     document.body.classList.remove('edit-mode');
     document.body.classList.remove('present-mode');
+    fitSlide2Content();
     try{
       await ensurePlanPdfLibs();
       const { jsPDF } = window.jspdf;
