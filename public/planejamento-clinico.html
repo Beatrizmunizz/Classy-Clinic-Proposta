@@ -141,7 +141,23 @@
   body:not(.edit-mode) .ph-zoom-wrap{ display:none !important; }
   .ph-zoom-wrap span{ font-size:12px; color:#fff; line-height:1; }
   .ph-zoom-wrap input[type="range"]{ flex:1; accent-color:#c6a06a; height:14px; }
-  @media print{ .ph-replace, .ph-zoom-wrap{ display:none !important; } }
+  .ph-nudge{
+    position:absolute; top:6px; left:6px; z-index:3; display:none;
+    grid-template-columns:18px 18px 18px; grid-template-rows:18px 18px;
+    grid-template-areas:". up ." "left down right"; gap:2px;
+  }
+  .photo-slot.has-img .ph-nudge{ display:grid; }
+  body:not(.edit-mode) .ph-nudge{ display:none !important; }
+  .ph-nudge button{
+    width:18px; height:18px; padding:0; border:none; border-radius:3px; font-size:10px; line-height:1;
+    background:rgba(20,10,10,0.5); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .ph-nudge button:hover{ background:rgba(20,10,10,0.75); }
+  .ph-nudge .nudge-up{ grid-area:up; }
+  .ph-nudge .nudge-left{ grid-area:left; }
+  .ph-nudge .nudge-down{ grid-area:down; }
+  .ph-nudge .nudge-right{ grid-area:right; }
+  @media print{ .ph-replace, .ph-zoom-wrap, .ph-nudge{ display:none !important; } }
 
   /* ================= SLIDE 1 — CAPA (foto fixa da marca) ================= */
   #slide1{
@@ -187,9 +203,8 @@
   .bullet-list li{ position:relative; padding-left:16px; margin-bottom:10px; break-inside:avoid; }
   .bullet-list li::before{ content:'—'; position:absolute; left:0; color:#5c1523; opacity:.55; }
   #slide2 .meta-wrap{ position:absolute; left:5%; bottom:3.5%; color:#8a7a72; }
-  /* quando a lista cresce demais para caber na altura disponível, ela reflui em 2 colunas em vez de vazar a página */
-  .field-block.s2-compact{ overflow:hidden; align-self:flex-start; }
-  .field-block.s2-compact .bullet-list{ column-count:2; column-gap:24px; column-fill:auto; height:100%; }
+  /* quando a lista cresce demais para caber na altura disponível, o texto encolhe gradualmente em vez de vazar a página ou quebrar em colunas estreitas */
+  .bullet-list{ transition:font-size .12s ease; }
 
   /* ================= SLIDE 3 — ANÁLISE 360º ================= */
   #slide3{ background:var(--paper); color:var(--ink); display:flex; flex-direction:column; }
@@ -388,6 +403,12 @@
           <div class="ph-label"><span class="ph-icon">＋</span>Foto</div>
           <input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise1')">
           <label class="ph-replace" title="Trocar foto">⟳<input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise1')"></label>
+          <div class="ph-nudge">
+            <button type="button" class="nudge-up" title="Mover para cima" onclick="nudgePhoto('slotAnalise1','up')">↑</button>
+            <button type="button" class="nudge-left" title="Mover para esquerda" onclick="nudgePhoto('slotAnalise1','left')">←</button>
+            <button type="button" class="nudge-down" title="Mover para baixo" onclick="nudgePhoto('slotAnalise1','down')">↓</button>
+            <button type="button" class="nudge-right" title="Mover para direita" onclick="nudgePhoto('slotAnalise1','right')">→</button>
+          </div>
           <div class="ph-zoom-wrap"><span>🔍</span><input type="range" min="100" max="250" value="100" oninput="setPhotoZoom('slotAnalise1', this.value)"></div>
         </div>
         <div class="photo-slot" id="slotAnalise2">
@@ -395,6 +416,12 @@
           <div class="ph-label"><span class="ph-icon">＋</span>Foto</div>
           <input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise2')">
           <label class="ph-replace" title="Trocar foto">⟳<input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise2')"></label>
+          <div class="ph-nudge">
+            <button type="button" class="nudge-up" title="Mover para cima" onclick="nudgePhoto('slotAnalise2','up')">↑</button>
+            <button type="button" class="nudge-left" title="Mover para esquerda" onclick="nudgePhoto('slotAnalise2','left')">←</button>
+            <button type="button" class="nudge-down" title="Mover para baixo" onclick="nudgePhoto('slotAnalise2','down')">↓</button>
+            <button type="button" class="nudge-right" title="Mover para direita" onclick="nudgePhoto('slotAnalise2','right')">→</button>
+          </div>
           <div class="ph-zoom-wrap"><span>🔍</span><input type="range" min="100" max="250" value="100" oninput="setPhotoZoom('slotAnalise2', this.value)"></div>
         </div>
         <div class="photo-slot" id="slotAnalise3">
@@ -402,6 +429,12 @@
           <div class="ph-label"><span class="ph-icon">＋</span>Foto</div>
           <input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise3')">
           <label class="ph-replace" title="Trocar foto">⟳<input type="file" accept="image/*" onchange="handlePhoto(event,'slotAnalise3')"></label>
+          <div class="ph-nudge">
+            <button type="button" class="nudge-up" title="Mover para cima" onclick="nudgePhoto('slotAnalise3','up')">↑</button>
+            <button type="button" class="nudge-left" title="Mover para esquerda" onclick="nudgePhoto('slotAnalise3','left')">←</button>
+            <button type="button" class="nudge-down" title="Mover para baixo" onclick="nudgePhoto('slotAnalise3','down')">↓</button>
+            <button type="button" class="nudge-right" title="Mover para direita" onclick="nudgePhoto('slotAnalise3','right')">→</button>
+          </div>
           <div class="ph-zoom-wrap"><span>🔍</span><input type="range" min="100" max="250" value="100" oninput="setPhotoZoom('slotAnalise3', this.value)"></div>
         </div>
       </div>
@@ -477,8 +510,8 @@
     fitSlide2Content();
   }
 
-  // ---- evita que a lista de queixa/histórico vaze da página: se não couber na altura,
-  // reflui automaticamente em 2 colunas dentro do próprio bloco ----
+  // ---- evita que a lista de queixa/histórico vaze da página: se o texto não couber na
+  // altura disponível, a fonte encolhe aos poucos até caber (mantendo as linhas inteiras) ----
   function fitSlide2Content(){
     const slide = document.getElementById('slide2');
     const wrap = slide && slide.querySelector('.s2-wrap');
@@ -487,11 +520,8 @@
     const blocks = slide ? Array.from(slide.querySelectorAll('.field-block')) : [];
     if(!slide || !wrap || !header || !blocks.length) return;
 
-    blocks.forEach(fb => {
-      fb.classList.remove('s2-compact');
-      fb.style.height = '';
-      fb.style.maxHeight = '';
-    });
+    const lists = blocks.map(fb => fb.querySelector('.bullet-list')).filter(Boolean);
+    lists.forEach(list => { list.style.fontSize = ''; });
 
     const slideRect = slide.getBoundingClientRect();
     const wrapRect = wrap.getBoundingClientRect();
@@ -500,14 +530,21 @@
     const headerH = header.getBoundingClientRect().height;
     const gapPx = parseFloat(getComputedStyle(wrap).rowGap || getComputedStyle(wrap).gap || '0') || 0;
     const available = slideRect.height - (wrapRect.top - slideRect.top) - metaH - safety - headerH - gapPx;
-    if(available < 60) return;
+    if(available < 40) return;
 
     blocks.forEach(fb => {
-      const h = fb.getBoundingClientRect().height;
-      if(h > available){
-        fb.classList.add('s2-compact');
-        fb.style.height = available + 'px';
-        fb.style.maxHeight = available + 'px';
+      const list = fb.querySelector('.bullet-list');
+      if(!list) return;
+      let h = fb.getBoundingClientRect().height;
+      if(h <= available) return;
+      const baseSize = parseFloat(getComputedStyle(list).fontSize);
+      let scale = 1;
+      let guard = 0;
+      while(h > available && scale > 0.55 && guard < 24){
+        scale -= 0.03;
+        list.style.fontSize = (baseSize * scale) + 'px';
+        h = fb.getBoundingClientRect().height;
+        guard++;
       }
     });
   }
@@ -599,13 +636,31 @@
     event.target.value = '';
   }
 
-  // ---- ajuste fino da foto: zoom (slider) e arraste para reposicionar ----
+  // ---- ajuste fino da foto: zoom (slider), arraste e setinhas para reposicionar ----
   function setPhotoZoom(slotId, value){
     const slot = document.getElementById(slotId);
     const img = slot && slot.querySelector('.ph-img');
     if(!img) return;
     img.dataset.zoom = value;
     img.style.transform = `scale(${value / 100})`;
+  }
+
+  function nudgePhoto(slotId, dir){
+    const slot = document.getElementById(slotId);
+    const img = slot && slot.querySelector('.ph-img');
+    if(!img) return;
+    const step = 4;
+    let px = parseFloat(img.dataset.px || '50');
+    let py = parseFloat(img.dataset.py || '50');
+    if(dir === 'left') px += step;
+    if(dir === 'right') px -= step;
+    if(dir === 'up') py += step;
+    if(dir === 'down') py -= step;
+    px = Math.max(0, Math.min(100, px));
+    py = Math.max(0, Math.min(100, py));
+    img.dataset.px = px;
+    img.dataset.py = py;
+    img.style.objectPosition = `${px}% ${py}%`;
   }
 
   function initPhotoDrag(slotId){
