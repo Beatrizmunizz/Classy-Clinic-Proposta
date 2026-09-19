@@ -93,6 +93,39 @@
     font-size:11px; color:var(--app-gray-400); text-align:center;
   }
 
+  /* ---------- Painel: planejamentos salvos ---------- */
+  #planListPanel{
+    max-width:min(1120px,94vw); margin:18px auto 0; background:var(--app-white);
+    border:1px solid var(--app-gray-150); border-radius:6px; padding:18px 20px;
+    display:none; box-shadow:0 2px 14px rgba(32,30,27,0.05);
+  }
+  #planListPanel.open{ display:block; }
+  .plan-list-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .plan-list-head h3{ font-family:'Cormorant Garamond',serif; font-weight:400; font-size:18px; margin:0; color:var(--app-black-soft); }
+  .plan-list-close{ border:none; background:none; font-size:16px; color:var(--app-gray-400); cursor:pointer; line-height:1; padding:4px; }
+  .plan-list-close:hover{ color:var(--app-black-soft); }
+  .plan-list-search{
+    width:100%; font-family:'Jost',sans-serif; font-size:13px; background:var(--app-white); color:var(--app-black-soft);
+    border:1px solid var(--app-gray-300); border-radius:3px; padding:8px 10px; margin-bottom:14px; box-sizing:border-box;
+  }
+  #planListResults{ display:flex; flex-direction:column; gap:8px; max-height:360px; overflow-y:auto; }
+  .plan-list-empty{ font-size:13px; color:var(--app-gray-400); margin:8px 0; }
+  .plan-list-item{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px;
+    border:1px solid var(--app-gray-150); border-radius:4px; background:var(--app-offwhite);
+  }
+  .plan-list-info{ display:flex; flex-direction:column; gap:2px; }
+  .plan-list-info strong{ font-size:14px; color:var(--app-black-soft); font-weight:600; }
+  .plan-list-info span{ font-size:12px; color:var(--app-gray-500); }
+  .plan-list-actions{ display:flex; gap:8px; flex-shrink:0; }
+  .plan-list-actions button{
+    font-family:'Jost',sans-serif; font-size:12px; border-radius:3px; padding:6px 12px; cursor:pointer;
+    border:1px solid var(--app-gray-300); background:var(--app-white); color:var(--app-black-soft);
+  }
+  .plan-list-actions button:hover{ background:var(--app-gray-100); }
+  .plan-list-actions .plan-list-delete{ color:#b23b3b; border-color:rgba(178,59,59,0.4); }
+  .plan-list-actions .plan-list-delete:hover{ background:rgba(178,59,59,0.08); }
+
   /* ---------- Layout (a área de trabalho fica clara; os slides mantêm suas próprias cores) ---------- */
   .workspace{ display:flex; flex-direction:column; align-items:center; gap:36px; padding:36px 16px 90px; }
   .slide{ position:relative; width:min(1120px, 94vw); aspect-ratio:16/9; overflow:hidden; box-shadow:0 12px 32px rgba(32,30,27,0.16); }
@@ -232,7 +265,7 @@
 
   /* ---------- Present mode ---------- */
   body.present-mode{ background:#000; }
-  body.present-mode .topbar, body.present-mode .slide-tools, body.present-mode #brandPanel, body.present-mode #dataPanel{ display:none; }
+  body.present-mode .topbar, body.present-mode .slide-tools, body.present-mode #brandPanel, body.present-mode #dataPanel, body.present-mode #planListPanel{ display:none; }
   body.present-mode .workspace{ padding:0; gap:0; }
   body.present-mode .slide{ display:none; width:100vw; height:100vh; aspect-ratio:auto; box-shadow:none; }
   body.present-mode .slide.active{ display:flex; }
@@ -251,7 +284,7 @@
   #present-dots span.active{ background:var(--gold); }
 
   @media print{
-    .topbar, .slide-tools, #present-nav, #brandPanel, #dataPanel{ display:none !important; }
+    .topbar, .slide-tools, #present-nav, #brandPanel, #dataPanel, #planListPanel{ display:none !important; }
     body{ background:#fff; }
     .workspace{ padding:0; gap:0; }
     .slide{ width:100vw; height:100vh; aspect-ratio:auto; box-shadow:none; page-break-after:always; }
@@ -271,12 +304,25 @@
   <div class="topbar">
     <h1>Planejamento Clínico — editor</h1>
     <div class="actions">
+      <button class="btn" onclick="openPlanList()">Planejamentos salvos</button>
+      <button class="btn" onclick="newPlan()">Novo</button>
       <button class="btn primary" onclick="toggleDataPanel()">Dados da consulta</button>
       <button class="btn" onclick="toggleBrandPanel()">Fotos fixas da marca</button>
       <button class="btn" id="toggleEditBtn" onclick="toggleEdit()">Travar edição</button>
+      <button class="btn" id="savePlanBtn" onclick="savePlan()">Salvar planejamento</button>
       <button class="btn" id="downloadPdfBtn" onclick="downloadPlanPdf()">Baixar PDF</button>
       <button class="btn primary" onclick="enterPresent()">Apresentar</button>
     </div>
+  </div>
+
+  <!-- ================= PAINEL: PLANEJAMENTOS SALVOS ================= -->
+  <div id="planListPanel">
+    <div class="plan-list-head">
+      <h3>Planejamentos salvos</h3>
+      <button type="button" class="plan-list-close" onclick="closePlanList()">✕</button>
+    </div>
+    <input type="text" id="planListSearch" class="plan-list-search" placeholder="Buscar por nome da paciente…" oninput="filterPlanList()">
+    <div id="planListResults"></div>
   </div>
 
   <div id="dataPanel" class="open">
@@ -600,6 +646,185 @@
   syncDate();
   setTimeout(fitSlide2Content, 0);
 
+  // ================= PERSISTÊNCIA (Supabase) — salvar/abrir planejamentos =================
+  const SUPABASE_URL = 'https://ihvxyxydpbvcdhatxooe.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_ibuwyXXd9zMSoQD-sGOZ4A_UVPKtVbj';
+  const sbHeaders = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+  const PLANS_TABLE = 'clinical_plans';
+
+  async function sbSelect(table, query){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*${query || ''}`, { headers: sbHeaders });
+    if(!res.ok) throw new Error('Falha ao carregar do Supabase (' + res.status + ')');
+    return res.json();
+  }
+  async function sbInsert(table, row){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method:'POST', headers: sbHeaders, body: JSON.stringify(row) });
+    if(!res.ok) throw new Error('Falha ao salvar no Supabase (' + res.status + ')');
+    return res.json();
+  }
+  async function sbUpdate(table, id, row){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method:'PATCH', headers: sbHeaders, body: JSON.stringify(row) });
+    if(!res.ok) throw new Error('Falha ao atualizar no Supabase (' + res.status + ')');
+    return res.json();
+  }
+  async function sbDelete(table, id){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method:'DELETE', headers: sbHeaders });
+    if(!res.ok) throw new Error('Falha ao excluir no Supabase (' + res.status + ')');
+  }
+
+  let currentPlanId = null;
+  let allPlans = [];
+  const ANALISE_SLOTS = ['slotAnalise1','slotAnalise2','slotAnalise3'];
+
+  function collectPlanData(){
+    const photos = ANALISE_SLOTS.map(id => {
+      const slot = document.getElementById(id);
+      const img = slot.querySelector('.ph-img');
+      if(!slot.classList.contains('has-img') || !img.src) return null;
+      return { dataUrl: img.src, zoom: img.dataset.zoom || '100', px: img.dataset.px || '50', py: img.dataset.py || '50' };
+    });
+    return {
+      patient_name: document.getElementById('formNome').value.trim(),
+      visit_date: mainDateInput.value || todayIso,
+      area: document.getElementById('formArea').value,
+      queixa: document.getElementById('formQueixa').value,
+      historico: document.getElementById('formHistorico').value,
+      photos,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  function applyPlanData(row){
+    currentPlanId = row.id;
+    document.getElementById('formNome').value = row.patient_name || '';
+    mainDateInput.value = row.visit_date || todayIso;
+    document.getElementById('formArea').value = row.area || 'Corporal';
+    document.getElementById('formQueixa').value = row.queixa || '';
+    document.getElementById('formHistorico').value = row.historico || '';
+    const photos = row.photos || [];
+    ANALISE_SLOTS.forEach((slotId, i) => {
+      const p = photos[i];
+      const slot = document.getElementById(slotId);
+      const img = slot.querySelector('.ph-img');
+      if(p && p.dataUrl){
+        setPhotoImage(slotId, p.dataUrl);
+        img.dataset.zoom = p.zoom || '100';
+        img.dataset.px = p.px || '50';
+        img.dataset.py = p.py || '50';
+        img.style.transform = `scale(${(p.zoom || 100) / 100})`;
+        img.style.objectPosition = `${p.px || 50}% ${p.py || 50}%`;
+        const zoomSlider = slot.querySelector('.ph-zoom-wrap input[type="range"]');
+        if(zoomSlider) zoomSlider.value = p.zoom || 100;
+      } else {
+        slot.classList.remove('has-img');
+        img.src = '';
+        img.style.transform = '';
+        img.style.objectPosition = '';
+      }
+    });
+    generatePlan();
+    closePlanList();
+  }
+
+  function newPlan(){
+    currentPlanId = null;
+    document.getElementById('formNome').value = '';
+    mainDateInput.value = todayIso;
+    document.getElementById('formArea').value = 'Corporal';
+    document.getElementById('formQueixa').value = '';
+    document.getElementById('formHistorico').value = '';
+    ANALISE_SLOTS.forEach(slotId => {
+      const slot = document.getElementById(slotId);
+      const img = slot.querySelector('.ph-img');
+      slot.classList.remove('has-img');
+      img.src = '';
+      img.style.transform = '';
+      img.style.objectPosition = '';
+    });
+    generatePlan();
+  }
+
+  async function savePlan(){
+    const btn = document.getElementById('savePlanBtn');
+    const original = btn.textContent;
+    const data = collectPlanData();
+    if(!data.patient_name){
+      alert('Preencha o nome da paciente antes de salvar.');
+      return;
+    }
+    btn.textContent = 'Salvando…';
+    btn.disabled = true;
+    try{
+      if(currentPlanId){
+        await sbUpdate(PLANS_TABLE, currentPlanId, data);
+      } else {
+        const inserted = await sbInsert(PLANS_TABLE, data);
+        currentPlanId = inserted && inserted[0] ? inserted[0].id : null;
+      }
+      btn.textContent = 'Salvo!';
+    } catch(err){
+      alert('Não foi possível salvar agora. ' + (err && err.message ? err.message : 'Verifique a conexão com o Supabase.'));
+      btn.textContent = original;
+    } finally {
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1400);
+    }
+  }
+
+  function openPlanList(){
+    document.getElementById('planListPanel').classList.add('open');
+    document.getElementById('planListSearch').value = '';
+    const results = document.getElementById('planListResults');
+    results.innerHTML = '<p class="plan-list-empty">Carregando…</p>';
+    sbSelect(PLANS_TABLE, '&order=updated_at.desc')
+      .then(rows => { allPlans = rows; renderPlanList(allPlans); })
+      .catch(() => { results.innerHTML = '<p class="plan-list-empty">Não foi possível carregar os planejamentos salvos.</p>'; });
+  }
+  function closePlanList(){ document.getElementById('planListPanel').classList.remove('open'); }
+  function filterPlanList(){
+    const term = document.getElementById('planListSearch').value.trim().toLowerCase();
+    const filtered = term ? allPlans.filter(p => (p.patient_name || '').toLowerCase().includes(term)) : allPlans;
+    renderPlanList(filtered);
+  }
+  function renderPlanList(rows){
+    const container = document.getElementById('planListResults');
+    if(!rows.length){
+      container.innerHTML = '<p class="plan-list-empty">Nenhum planejamento encontrado.</p>';
+      return;
+    }
+    container.innerHTML = rows.map(r => `
+      <div class="plan-list-item">
+        <div class="plan-list-info">
+          <strong>${escapeHtml(r.patient_name || 'Sem nome')}</strong>
+          <span>${formatDateBR(r.visit_date)} · ${escapeHtml(r.area || '')}</span>
+        </div>
+        <div class="plan-list-actions">
+          <button type="button" onclick="loadPlanById('${r.id}')">Abrir</button>
+          <button type="button" class="plan-list-delete" onclick="deletePlanById('${r.id}')">Excluir</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  function loadPlanById(id){
+    const row = allPlans.find(p => p.id === id);
+    if(row) applyPlanData(row);
+  }
+  async function deletePlanById(id){
+    if(!confirm('Excluir este planejamento salvo? Essa ação não pode ser desfeita.')) return;
+    try{
+      await sbDelete(PLANS_TABLE, id);
+      allPlans = allPlans.filter(p => p.id !== id);
+      filterPlanList();
+      if(currentPlanId === id) currentPlanId = null;
+    } catch(err){
+      alert('Não foi possível excluir agora. Verifique a conexão com o Supabase.');
+    }
+  }
+
   // ---- per-patient photo upload (slides 2 & 3), com zoom e reposicionamento ----
   function setPhotoImage(slotId, dataUrl){
     const slot = document.getElementById(slotId);
@@ -789,18 +1014,18 @@
       for(let i = 0; i < slideEls.length; i++){
         const el = slideEls[i];
         const canvas = await window.html2canvas(el, {
-          scale: 2,
+          scale: 3,
           useCORS: true,
           backgroundColor: '#ffffff',
           windowWidth: Math.max(document.documentElement.clientWidth, 1400),
         });
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgData = canvas.toDataURL('image/png');
         if(i === 0){
           doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height], compress: true });
         } else {
           doc.addPage([canvas.width, canvas.height], 'landscape');
         }
-        doc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+        doc.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       }
       const nomeBruto = (document.getElementById('formNome').value || 'paciente').trim();
       const nomeArquivo = nomeBruto.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') || 'paciente';
